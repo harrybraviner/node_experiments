@@ -28,7 +28,7 @@ class EWMA:
 
 class BaseNetwork(ABC):
 
-    def __init__(self, img_h: int=28, img_w: int=28, num_classes: int=10):
+    def __init__(self, img_h: int=28, img_w: int=28, num_classes: int=10, learning_rate=1e-2):
         # Placeholders
         self._input_img_batch = tf.placeholder(shape=(None, img_h, img_w, 1), dtype=tf.float32)
         self._input_ground_truth_oh= tf.placeholder(shape=(None, num_classes), dtype=tf.float32)
@@ -47,7 +47,7 @@ class BaseNetwork(ABC):
         self._correct_predictions = tf.math.equal(self._output_class, self._gt_class)
         self._acc = tf.reduce_mean(tf.cast(self._correct_predictions, dtype=tf.float32), axis=0)
         
-        self._train_step = tf.train.MomentumOptimizer(learning_rate=1e-2, momentum=0.9).minimize(self.ce_loss)
+        self._train_step = tf.train.MomentumOptimizer(learning_rate=learning_rate, momentum=0.9).minimize(self.ce_loss)
     
         self._sess = tf.Session()
         self._sess.run(tf.global_variables_initializer())
@@ -110,6 +110,13 @@ class BaseNetwork(ABC):
         return {'num_training_examples': self._val_num_training_examples,
                 'cross-entropy': self._val_ce_history,
                 'accuracy': self._val_acc_history}
+
+    def get_final_validation_error(self):
+        """
+        Returns the final validation error we have stored.
+        Does not do any additional compution.
+        """
+        return 1.0 - self._val_acc_history[-1]
 
     def show_report(self):
 
