@@ -31,6 +31,8 @@ class BaseNetwork:
         self._input_img_batch = tf.placeholder(shape=(None, img_h, img_w, 1), dtype=tf.float32)
         self._input_ground_truth_oh= tf.placeholder(shape=(None, num_classes), dtype=tf.float32)
 
+        self._batch_size = tf.shape(self._input_img_batch)[0]
+
         # Delegate building the actual network to a method
         self._output_logits = self._get_logits(self._input_img_batch)
 
@@ -67,6 +69,13 @@ class BaseNetwork:
         self._ce_history.append(self._running_ce.get())
         self._running_acc.update(acc_this_batch)
         self._acc_history.append(self._running_acc.get())
+
+    def evaluate_on_batch(self, input_images, input_gt_oh):
+
+        ce_this_batch, acc_this_batch, size_this_batch = self._sess.run([self.ce_loss, self._acc, self._batch_size],
+                                                                        feed_dict={self._input_img_batch: input_images,
+                                                                                   self._input_ground_truth_oh: input_gt_oh})
+        return size_this_batch, ce_this_batch, acc_this_batch
 
 
 def res_block(input_tensor: tf.Tensor, in_filters: int, out_filters: int, stride=1) -> tf.Tensor:

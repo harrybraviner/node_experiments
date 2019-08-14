@@ -53,7 +53,7 @@ class ImageAndLabelSet:
         self.label_set = LabelSet(filename_labels)
 
         self._N_images = self.image_set._N_images
-        self.next_index = 1
+        self.next_index = 0
 
         if training_fraction < 0.0 or training_fraction > 1.0:
             raise ValueError('training_fraction must be between 0.0 and 1.0')
@@ -61,7 +61,7 @@ class ImageAndLabelSet:
         self._N_training = int(self._N_images * self._training_fraction)
 
         # Select pseudo-randomly some images to use for validation
-        all_indices = np.arange(0, self._N_images)
+        all_indices = np.arange(1, self._N_images + 1)
         rng = np.random.RandomState(12345)
         rng.shuffle(all_indices)
         self.training_indices = all_indices[:self._N_training]
@@ -73,16 +73,16 @@ class ImageAndLabelSet:
         remaining_images = batch_size
         while (remaining_images > 0):
             training_index = self.training_indices[self.next_index]
-            image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(self.next_index), (1, 784))], axis=0)
-            label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(self.next_index), (1, 10))], axis=0)
+            image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(training_index), (1, 784))], axis=0)
+            label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(training_index), (1, 10))], axis=0)
             remaining_images -= 1
             self.next_index = self.next_index + 1
-            if (self.next_index > self._N_training):
-                self.next_index = 1
+            if (self.next_index == self._N_training):
+                self.next_index = 0
         return image_batch, label_batch
 
     def get_validation_batches(self, batch_size=32):
-        remaining_images_in_valiadtion_set = self._N_images = self._N_training
+        remaining_images_in_valiadtion_set = self._N_images - self._N_training
         next_index = 0 # Note  - different from self.next_index
 
         while remaining_images_in_valiadtion_set > 0:
@@ -90,9 +90,9 @@ class ImageAndLabelSet:
             label_batch = np.reshape([], (0, 10))
 
             for _ in range(min(remaining_images_in_valiadtion_set, batch_size)):
-                validiation_index = self.validation_indices[next_index]
-                image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(next_index), (1, 784))], axis=0)
-                label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(self.next_index), (1, 10))], axis=0)
+                validation_index = self.validation_indices[next_index]
+                image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(validation_index), (1, 784))], axis=0)
+                label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(validation_index), (1, 10))], axis=0)
 
                 remaining_images_in_valiadtion_set -= 1
                 next_index += 1
