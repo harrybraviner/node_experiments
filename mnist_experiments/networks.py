@@ -50,9 +50,10 @@ class BaseNetwork:
         self._sess = tf.Session()
         self._sess.run(tf.global_variables_initializer())
         
-        self._running_ce = EWMA(decay_lambda=0.1)
+        # Track training history
+        self._running_ce = EWMA(decay_lambda=0.01)
         self._ce_history = []
-        self._running_acc = EWMA(decay_lambda=0.1)
+        self._running_acc = EWMA(decay_lambda=0.01)
         self._acc_history = []
 
     @abstractmethod
