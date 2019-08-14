@@ -7,7 +7,7 @@ class ImageSet:
         self.f = open(filename, "rb")
 
         self.f.seek(4)
-        self.N_images = int.from_bytes(self.f.read(4), byteorder="big")
+        self._N_images = int.from_bytes(self.f.read(4), byteorder="big")
 
         self.f.seek(8)
         self.rows = int.from_bytes(self.f.read(4), byteorder="big")
@@ -18,7 +18,7 @@ class ImageSet:
         self.next_index = 1
 
     def getImageAsBytes(self, index):
-        if (index < 1 or index > self.N_images):
+        if (index < 1 or index > self._N_images):
             return None
         else:
             self.f.seek(16 + (index-1)*self.rows*self.cols)
@@ -48,30 +48,61 @@ class LabelSet:
         return one_hot
 
 class ImageAndLabelSet:
-    def __init__(self, filename_images, filename_labels):
+    def __init__(self, filename_images, filename_labels, training_fraction=1.0):
         self.image_set = ImageSet(filename_images)
         self.label_set = LabelSet(filename_labels)
 
-        self.N_images = self.image_set.N_images
+        self._N_images = self.image_set._N_images
         self.next_index = 1
 
-    def getNextBatch(self, batchSize):
+        if training_fraction < 0.0 or training_fraction > 1.0:
+            raise ValueError('training_fraction must be between 0.0 and 1.0')
+        self._training_fraction = training_fraction
+        self._N_training = int(self._N_images * self._training_fraction)
+
+        # Select pseudo-randomly some images to use for validation
+        all_indices = np.arange(0, self._N_images)
+        rng = np.random.RandomState(12345)
+        rng.shuffle(all_indices)
+        self.training_indices = all_indices[:self._N_training]
+        self.validation_indices = all_indices[self._N_training:]
+
+    def get_next_training_batch(self, batch_size=32):
         image_batch = np.reshape([], (0, 784))
         label_batch = np.reshape([], (0, 10))
-        remaining_images = batchSize
+        remaining_images = batch_size
         while (remaining_images > 0):
+            training_index = self.training_indices[self.next_index]
             image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(self.next_index), (1, 784))], axis=0)
             label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(self.next_index), (1, 10))], axis=0)
             remaining_images -= 1
             self.next_index = self.next_index + 1
-            if (self.next_index > self.N_images):
+            if (self.next_index > self._N_training):
                 self.next_index = 1
         return image_batch, label_batch
+
+    def get_validation_batches(self, batch_size=32):
+        remaining_images_in_valiadtion_set = self._N_images = self._N_training
+        next_index = 0 # Note  - different from self.next_index
+
+        while remaining_images_in_valiadtion_set > 0:
+            image_batch = np.reshape([], (0, 784))
+            label_batch = np.reshape([], (0, 10))
+
+            for _ in range(min(remaining_images_in_valiadtion_set, batch_size)):
+                validiation_index = self.validation_indices[next_index]
+                image_batch = np.concatenate([image_batch, np.reshape(self.image_set.getImageAsFloatArray(next_index), (1, 784))], axis=0)
+                label_batch = np.concatenate([label_batch, np.reshape(self.label_set.getOneHotLabel(self.next_index), (1, 10))], axis=0)
+
+                remaining_images_in_valiadtion_set -= 1
+                next_index += 1
+
+            yield image_batch, label_batch
 
     def getAll(self):
         saved_index = self.next_index
         self.next_index = 1
-        batch_for_return = self.getNextBatch(self.N_images)
+        batch_for_return = self.getNextBatch(self._N_images)
         self.next_index = saved_index
         return batch_for_return
 
