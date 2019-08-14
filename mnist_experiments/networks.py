@@ -25,7 +25,7 @@ class EWMA:
         return self._running_ewma
 
 
-class BaseNetwork:
+class BaseNetwork(ABC):
 
     def __init__(self, img_h: int=28, img_w: int=28, num_classes: int=10):
         # Placeholders
