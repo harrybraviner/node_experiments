@@ -1,6 +1,7 @@
 import tensorflow as tf
 import numpy as np
 from abc import ABC, abstractmethod
+from typing import Generator, Tuple
 
 
 class EWMA:
@@ -55,6 +56,12 @@ class BaseNetwork:
         self._ce_history = []
         self._running_acc = EWMA(decay_lambda=0.01)
         self._acc_history = []
+        self._num_training_examples = 0
+
+        # Validation performance
+        self._val_num_training_examples = []
+        self._val_ce_history = []
+        self._val_acc_history = []
 
     @abstractmethod
     def _get_logits(self, input_img: tf.Tensor) -> tf.Tensor:
@@ -62,14 +69,15 @@ class BaseNetwork:
 
     def train_batch(self, input_images, input_gt_oh):
         
-        _, ce_this_batch, acc_this_batch = self._sess.run([self._train_step, self.ce_loss, self._acc],
-                                                          feed_dict={self._input_img_batch: input_images,
-                                                                     self._input_ground_truth_oh: input_gt_oh})
+        _, ce_this_batch, acc_this_batch, size_this_batch = self._sess.run([self._train_step, self.ce_loss, self._acc, self._batch_size],
+                                                                           feed_dict={self._input_img_batch: input_images,
+                                                                                      self._input_ground_truth_oh: input_gt_oh})
         
         self._running_ce.update(ce_this_batch)
         self._ce_history.append(self._running_ce.get())
         self._running_acc.update(acc_this_batch)
         self._acc_history.append(self._running_acc.get())
+        self._num_training_examples += size_this_batch
 
     def evaluate_on_batch(self, input_images, input_gt_oh):
 
@@ -77,6 +85,30 @@ class BaseNetwork:
                                                                         feed_dict={self._input_img_batch: input_images,
                                                                                    self._input_ground_truth_oh: input_gt_oh})
         return size_this_batch, ce_this_batch, acc_this_batch
+
+    def evaluate_on_batch_generator(self, batch_generator: Generator[Tuple[np.array, np.array], None, None]):
+
+        count_running = 0
+        ce_running = 0.0
+        acc_running = 0.0
+
+        for image_batch, label_batch in batch_generator:
+            image_batch = np.reshape(image_batch, newshape=(-1, 28, 28, 1))
+            count_this_batch, ce_this_batch, acc_this_batch = self.evaluate_on_batch(image_batch, label_batch)
+
+            ce_running += (ce_this_batch - ce_running) * count_this_batch / (count_this_batch + count_running)
+            acc_running += (acc_this_batch - acc_running) * count_this_batch / (count_this_batch + count_running)
+            count_running += count_this_batch
+        
+        self._val_num_training_examples.append(self._num_training_examples)
+        self._val_ce_history.append(ce_running)
+        self._val_acc_history.append(acc_running)
+
+    def get_validation_history(self):
+
+        return {'num_training_examples': self._val_num_training_examples,
+                'cross-entropy': self._val_ce_history,
+                'accuracy': self._val_acc_history}
 
 
 def res_block(input_tensor: tf.Tensor, in_filters: int, out_filters: int, stride=1) -> tf.Tensor:
