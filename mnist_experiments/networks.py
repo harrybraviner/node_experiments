@@ -132,7 +132,35 @@ class FCNet(BaseNetwork):
 
         flattened_ds_img = tf.reshape(downsampled_img, shape=(-1, dim_ds_img))
         flattened_act = tf.nn.relu(flattened_ds_img)
-        self._flattened_act = flattened_act
+
+        W_range = np.sqrt(6) / (np.sqrt(dim_ds_img) + np.sqrt(10))
+        W_fc = tf.Variable(tf.random.uniform(shape=(dim_ds_img, 10), dtype=tf.float32,
+                                             minval=-W_range, maxval=+W_range), name='W_fc')
+        b_fc = tf.Variable(tf.zeros(shape=(10), dtype=tf.float32))
+        return tf.matmul(flattened_act, W_fc)
+
+
+class ResNet6(BaseNetwork):
+    """
+    Network used by Chen et al. in their paper.
+    Uses 6 residual blocks after the downsampling layer.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super(ResNet6, self).__init__(*args, **kwargs)
+
+    def _get_logits(self, input_img: tf.Tensor) -> tf.Tensor:
+        img_h, img_w = input_img.shape.as_list()[1:3]   # Get image dimensions
+
+        downsampled_img = downsample_net(self._input_img_batch, n_filters=64)
+        dim_ds_img = (img_h//4)*(img_w//4)*64
+
+        x = downsampled_img
+        for _ in range(6):
+            x = res_block(x, 64, 64)
+
+        flattened_x = tf.reshape(x, shape=(-1, dim_ds_img))
+        flattened_act = tf.nn.relu(flattened_x)
 
         W_range = np.sqrt(6) / (np.sqrt(dim_ds_img) + np.sqrt(10))
         W_fc = tf.Variable(tf.random.uniform(shape=(dim_ds_img, 10), dtype=tf.float32,
