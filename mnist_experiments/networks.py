@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Generator, Tuple
+import matplotlib.pyplot as plt
 
 
 class EWMA:
@@ -109,6 +110,32 @@ class BaseNetwork(ABC):
         return {'num_training_examples': self._val_num_training_examples,
                 'cross-entropy': self._val_ce_history,
                 'accuracy': self._val_acc_history}
+
+    def show_report(self):
+
+        # Make the training plot
+        fig, ax = plt.subplots()
+        ax.plot(self._ce_history)
+        ax.set_ylabel('Cross-entropy')
+        ax2 = ax.twinx()
+        ax2.plot([100.0*(1.0 - x) for x in self._acc_history], 'r')
+        ax2.set_yscale('log')
+        ax2.set_ylabel('Error rate (%)')
+        plt.show()
+
+        # Make the validation plot
+        fig, ax = plt.subplots()
+        num_samples, ce_hist, acc_hist = [self.get_validation_history()[x]
+                                          for x in ['num_training_examples', 'cross-entropy', 'accuracy']]
+        ax.plot(num_samples, ce_hist)
+        ax.set_ylabel('Cross-entropy')
+        ax2 = ax.twinx()
+        ax2.plot(num_samples, [100.0*(1.0 - acc) for acc in acc_hist], 'r')
+        ax2.set_yscale('log')
+        ax2.set_ylabel('Error rate [%]')
+        plt.show()
+
+        print('Validation error rate after {} training samples is {:.4}%'.format(num_samples[-1], 100.0*(1.0 - acc_hist[-1])))
 
 
 def res_block(input_tensor: tf.Tensor, in_filters: int, out_filters: int, stride=1) -> tf.Tensor:
